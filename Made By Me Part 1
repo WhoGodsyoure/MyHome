@@ -1,5 +1,6 @@
 --!nocheck
--- Simple GUI Library by Grok (2025-2026 style)
+-- Simple GUI Library (Enhanced 2025-2026 style) by Grok
+-- Fitur utama: Dropdown sekarang pakai ScrollingFrame + auto close saat klik luar
 
 local Library = {}
 
@@ -9,9 +10,9 @@ local RunService = game:GetService("RunService")
 
 local function create(class, props)
     local obj = Instance.new(class)
-    for k,v in pairs(props or {}) do
+    for k, v in pairs(props or {}) do
         if k ~= "Parent" then
-            obj[k] = v
+            pcall(function() obj[k] = v end)
         end
     end
     if props and props.Parent then
@@ -25,13 +26,12 @@ local function dragify(frame)
 
     local function update(input)
         local delta = input.Position - dragStart
-        local newPos = UDim2.new(
+        frame.Position = UDim2.new(
             startPos.X.Scale,
             startPos.X.Offset + delta.X,
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
-        frame.Position = newPos
     end
 
     frame.InputBegan:Connect(function(input)
@@ -78,7 +78,7 @@ function Library:CreateWindow(options)
         BackgroundColor3 = Color3.fromRGB(25, 25, 30),
         BorderSizePixel = 0,
         Position = UDim2.new(0.5, -160, 0.5, -140),
-        Size = UDim2.new(0, 300, 0, 300),
+        Size = UDim2.new(0, 320, 0, 340),
         ClipsDescendants = true
     })
 
@@ -95,7 +95,7 @@ function Library:CreateWindow(options)
         Name = "Title",
         Parent = TitleBar,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, -40, 1, 0),
+        Size = UDim2.new(1, -50, 1, 0),
         Position = UDim2.new(0, 12, 0, 0),
         Font = Enum.Font.GothamBold,
         Text = title,
@@ -120,7 +120,7 @@ function Library:CreateWindow(options)
         ScreenGui:Destroy()
     end)
 
-    -- Scrolling content area
+    -- Content area
     local ScrollingFrame = create("ScrollingFrame", {
         Name = "Content",
         Parent = MainFrame,
@@ -129,7 +129,8 @@ function Library:CreateWindow(options)
         Size = UDim2.new(1, 0, 1, -36),
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 5,
-        ScrollBarImageColor3 = Color3.fromRGB(80, 80, 100)
+        ScrollBarImageColor3 = Color3.fromRGB(80, 80, 100),
+        ScrollingDirection = Enum.ScrollingDirection.Y
     })
 
     local UIListLayout = create("UIListLayout", {
@@ -141,7 +142,7 @@ function Library:CreateWindow(options)
     })
 
     UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 16)
+        ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
     end)
 
     dragify(MainFrame)
@@ -153,7 +154,7 @@ function Library:CreateWindow(options)
             Name = name,
             Parent = ScrollingFrame,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, -20, 0, 0),
+            Size = UDim2.new(1, -24, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y
         })
 
@@ -161,9 +162,9 @@ function Library:CreateWindow(options)
             Name = "SectionTitle",
             Parent = SectionFrame,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 26),
+            Size = UDim2.new(1, 0, 0, 28),
             Font = Enum.Font.GothamSemibold,
-            Text = name,
+            Text = "  " .. name,
             TextColor3 = Color3.fromRGB(150, 210, 255),
             TextSize = 15,
             TextXAlignment = Enum.TextXAlignment.Left
@@ -178,7 +179,7 @@ function Library:CreateWindow(options)
         })
 
         List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            SectionFrame.Size = UDim2.new(1, -20, 0, List.AbsoluteContentSize.Y + 4)
+            SectionFrame.Size = UDim2.new(1, -24, 0, List.AbsoluteContentSize.Y + 8)
         end)
 
         local Section = {}
@@ -236,7 +237,7 @@ function Library:CreateWindow(options)
             })
             create("UICorner", {Parent = frame, CornerRadius = UDim.new(0,6)})
 
-            local title = create("TextLabel", {
+            create("TextLabel", {
                 Parent = frame,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(0.65, 0, 1, 0),
@@ -274,8 +275,15 @@ function Library:CreateWindow(options)
                 end
             end)
 
-            update() -- initial state
-            return {Toggle = function(v) state=v update() callback(v) end}
+            update()
+            return {
+                Toggle = function(v)
+                    state = v
+                    update()
+                    task.spawn(callback, v)
+                end,
+                Value = function() return state end
+            }
         end
 
         function Section:Slider(label, min, max, default, step, callback)
@@ -364,23 +372,25 @@ function Library:CreateWindow(options)
                 end
             end)
 
-            -- initial
+            -- initial value
             local initRel = (default - min) / (max - min)
             fill.Size = UDim2.new(initRel, 0, 1, 0)
             valueLabel.Text = tostring(default)
 
-            return {Set = function(v)
-                v = math.clamp(v, min, max)
-                local rel = (v - min) / (max - min)
-                fill.Size = UDim2.new(rel, 0, 1, 0)
-                valueLabel.Text = tostring(v)
-                task.spawn(callback, v)
-            end}
+            return {
+                Set = function(v)
+                    v = math.clamp(v, min, max)
+                    local rel = (v - min) / (max - min)
+                    fill.Size = UDim2.new(rel, 0, 1, 0)
+                    valueLabel.Text = tostring(v)
+                    task.spawn(callback, v)
+                end
+            }
         end
 
         function Section:Dropdown(label, options, default, callback)
             options = options or {}
-            default = default or options[1]
+            default = default or (options[1] or "...")
             callback = callback or function() end
 
             local frame = create("Frame", {
@@ -390,105 +400,167 @@ function Library:CreateWindow(options)
             })
             create("UICorner", {Parent = frame, CornerRadius = UDim.new(0,6)})
 
-            local title = create("TextLabel", {
+            create("TextLabel", {
                 Parent = frame,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(0.5, 0, 1, 0),
+                Size = UDim2.new(0.58, 0, 1, 0),
                 Position = UDim2.new(0,12,0,0),
                 Font = Enum.Font.GothamSemibold,
                 Text = label,
                 TextColor3 = Color3.new(1,1,1),
                 TextSize = 14,
-                TextXAlignment = Enum.TextXAlignment.Left
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd
             })
 
             local selected = create("TextLabel", {
                 Parent = frame,
                 BackgroundColor3 = Color3.fromRGB(35,35,45),
-                Size = UDim2.new(0.42, 0, 0.8, 0),
-                Position = UDim2.new(0.56, 0, 0.1, 0),
+                Size = UDim2.new(0.38, 0, 0.82, 0),
+                Position = UDim2.new(0.6, 0, 0.09, 0),
                 Font = Enum.Font.Gotham,
-                Text = default or "...",
+                Text = tostring(default),
                 TextColor3 = Color3.fromRGB(200,220,255),
-                TextSize = 13
+                TextSize = 13,
+                TextTruncate = Enum.TextTruncate.AtEnd
             })
             create("UICorner", {Parent = selected, CornerRadius = UDim.new(0,5)})
             create("UIStroke", {Parent = selected, Color = Color3.fromRGB(70,70,90), Thickness = 1})
 
+            local arrow = create("TextLabel", {
+                Parent = selected,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0,20,1,0),
+                Position = UDim2.new(1,-22,0,0),
+                Font = Enum.Font.GothamBold,
+                Text = "▼",
+                TextColor3 = Color3.fromRGB(160,160,180),
+                TextSize = 14
+            })
+
             local isOpen = false
-            local listFrame = nil
+            local dropdownList = nil
+            local connections = {}
 
             local function closeDropdown()
-                if listFrame then
-                    listFrame:Destroy()
-                    listFrame = nil
+                if dropdownList then
+                    dropdownList:Destroy()
+                    dropdownList = nil
                 end
                 isOpen = false
-            end
-
-            local function toggleDropdown()
-                if isOpen then
-                    closeDropdown()
-                else
-                    isOpen = true
-                    listFrame = create("Frame", {
-                        Parent = ScrollingFrame,
-                        BackgroundColor3 = Color3.fromRGB(30,30,40),
-                        BorderSizePixel = 0,
-                        Size = UDim2.new(0, selected.AbsoluteSize.X, 0, math.min(#options * 32 + 4, 160)),
-                        Position = UDim2.new(0, selected.AbsolutePosition.X, 0, selected.AbsolutePosition.Y + selected.AbsoluteSize.Y + 4),
-                        ZIndex = 10
-                    })
-                    create("UICorner", {Parent = listFrame, CornerRadius = UDim.new(0,6)})
-                    create("UIStroke", {Parent = listFrame, Color = Color3.fromRGB(80,80,110), Thickness = 1})
-
-                    local listLayout = create("UIListLayout", {
-                        Parent = listFrame,
-                        Padding = UDim.new(0,2),
-                        SortOrder = Enum.SortOrder.LayoutOrder
-                    })
-
-                    for _, opt in ipairs(options) do
-                        local btn = create("TextButton", {
-                            Parent = listFrame,
-                            BackgroundTransparency = 1,
-                            Size = UDim2.new(1, -8, 0, 30),
-                            Position = UDim2.new(0,4,0,0),
-                            Font = Enum.Font.Gotham,
-                            Text = opt,
-                            TextColor3 = Color3.new(1,1,1),
-                            TextSize = 13
-                        })
-
-                        btn.MouseButton1Click:Connect(function()
-                            selected.Text = opt
-                            closeDropdown()
-                            task.spawn(callback, opt)
-                        end)
-
-                        btn.MouseEnter:Connect(function()
-                            btn.BackgroundTransparency = 0.7
-                            btn.BackgroundColor3 = Color3.fromRGB(70,70,100)
-                        end)
-                        btn.MouseLeave:Connect(function()
-                            btn.BackgroundTransparency = 1
-                        end)
-                    end
+                arrow.Text = "▼"
+                for _, conn in ipairs(connections) do
+                    conn:Disconnect()
                 end
+                table.clear(connections)
             end
 
-            frame.InputBegan:Connect(function(inp)
-                if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-                    toggleDropdown()
+            local function openDropdown()
+                if isOpen then return end
+                isOpen = true
+                arrow.Text = "▲"
+
+                local absPos = selected.AbsolutePosition
+                local absSize = selected.AbsoluteSize
+                local parentAbsPos = ScrollingFrame.AbsolutePosition
+
+                local relX = absPos.X - parentAbsPos.X
+                local relY = absPos.Y - parentAbsPos.Y + absSize.Y + 4
+
+                dropdownList = create("ScrollingFrame", {
+                    Parent = ScrollingFrame,
+                    BackgroundColor3 = Color3.fromRGB(30,30,40),
+                    BorderSizePixel = 0,
+                    Size = UDim2.new(0, absSize.X, 0, math.min(#options * 32 + 8, 200)),
+                    Position = UDim2.new(0, relX, 0, relY),
+                    CanvasSize = UDim2.new(0,0,0,0),
+                    ScrollBarThickness = 4,
+                    ScrollBarImageColor3 = Color3.fromRGB(90,90,120),
+                    ZIndex = 20,
+                    ClipsDescendants = true
+                })
+                create("UICorner", {Parent = dropdownList, CornerRadius = UDim.new(0,6)})
+                create("UIStroke", {Parent = dropdownList, Color = Color3.fromRGB(80,80,110), Thickness = 1})
+
+                local listLayout = create("UIListLayout", {
+                    Parent = dropdownList,
+                    Padding = UDim.new(0,2),
+                    SortOrder = Enum.SortOrder.LayoutOrder,
+                    FillDirection = Enum.FillDirection.Vertical
+                })
+
+                local function updateCanvas()
+                    dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 6)
+                end
+
+                listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+
+                for _, opt in ipairs(options) do
+                    local btn = create("TextButton", {
+                        Parent = dropdownList,
+                        BackgroundTransparency = 1,
+                        Size = UDim2.new(1, -8, 0, 30),
+                        Font = Enum.Font.Gotham,
+                        Text = "  " .. tostring(opt),
+                        TextColor3 = Color3.new(1,1,1),
+                        TextSize = 13,
+                        TextXAlignment = Enum.TextXAlignment.Left
+                    })
+
+                    btn.MouseEnter:Connect(function()
+                        btn.BackgroundTransparency = 0.7
+                        btn.BackgroundColor3 = Color3.fromRGB(70,70,100)
+                    end)
+                    btn.MouseLeave:Connect(function()
+                        btn.BackgroundTransparency = 1
+                    end)
+
+                    btn.MouseButton1Click:Connect(function()
+                        selected.Text = tostring(opt)
+                        closeDropdown()
+                        task.spawn(callback, opt)
+                    end)
+                end
+
+                updateCanvas()
+
+                -- Tutup kalau klik di luar dropdown
+                table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if gameProcessed then return end
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        local mousePos = input.Position
+                        local listAbsPos = dropdownList.AbsolutePosition
+                        local listAbsSize = dropdownList.AbsoluteSize
+
+                        if not (mousePos.X >= listAbsPos.X and mousePos.X <= listAbsPos.X + listAbsSize.X and
+                                mousePos.Y >= listAbsPos.Y and mousePos.Y <= listAbsPos.Y + listAbsSize.Y) then
+                            closeDropdown()
+                        end
+                    end
+                end))
+            end
+
+            frame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    if isOpen then
+                        closeDropdown()
+                    else
+                        openDropdown()
+                    end
                 end
             end)
 
-            return {Set = function(v)
-                if table.find(options, v) then
-                    selected.Text = v
-                    task.spawn(callback, v)
+            return {
+                Set = function(value)
+                    if table.find(options, value) then
+                        selected.Text = tostring(value)
+                        task.spawn(callback, value)
+                    end
+                end,
+                Get = function()
+                    return selected.Text
                 end
-            end}
+            }
         end
 
         return Section
